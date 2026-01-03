@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { QuizState, QuizResult, Question, HubSection } from './types';
 import { generateQuestions, generateFactSheet } from './services/geminiService';
 import Button from './components/Button';
@@ -24,10 +24,12 @@ const App: React.FC = () => {
     error: null
   });
 
+  const [lastAction, setLastAction] = useState<{ type: 'quiz' | 'hub', data?: HubSection } | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
 
-  const startQuiz = async () => {
+  const startQuiz = useCallback(async () => {
+    setLastAction({ type: 'quiz' });
     setState(prev => ({ ...prev, status: 'loading', error: null }));
     try {
       const questions = await generateQuestions(5);
@@ -41,12 +43,13 @@ const App: React.FC = () => {
     } catch (error: any) {
       setState(prev => ({ ...prev, status: 'error', error: error.message }));
     }
-  };
+  }, []);
 
-  const openHub = async (section: HubSection) => {
+  const openHub = useCallback(async (section: HubSection) => {
+    setLastAction({ type: 'hub', data: section });
     setState(prev => ({ ...prev, status: 'loading', error: null }));
     try {
-      const content = await generateFactSheet(section.prompt);
+      const content = await generateFactSheet(section.id, section.prompt);
       setState(prev => ({
         ...prev,
         status: 'browsing',
@@ -55,6 +58,14 @@ const App: React.FC = () => {
       }));
     } catch (error: any) {
       setState(prev => ({ ...prev, status: 'error', error: error.message }));
+    }
+  }, []);
+
+  const handleRetry = () => {
+    if (lastAction?.type === 'quiz') {
+      startQuiz();
+    } else if (lastAction?.type === 'hub' && lastAction.data) {
+      openHub(lastAction.data);
     }
   };
 
@@ -68,6 +79,7 @@ const App: React.FC = () => {
     });
     setSelectedAnswer(null);
     setIsRevealed(false);
+    setLastAction(null);
   };
 
   const currentQuestion = state.questions[state.currentQuestionIndex];
@@ -106,7 +118,6 @@ const App: React.FC = () => {
                 <Button onClick={startQuiz} className="py-5 px-10 text-xl rounded-2xl shadow-xl shadow-emerald-200">
                   Take Promo Quiz
                 </Button>
-                <div className="py-5 px-10 text-xl font-bold text-slate-400 flex items-center justify-center">OR</div>
               </div>
             </section>
 
@@ -145,7 +156,9 @@ const App: React.FC = () => {
               <i className="fa-solid fa-spinner fa-spin text-3xl text-emerald-600"></i>
             </div>
             <h3 className="text-2xl font-bold text-slate-800">Synchronizing 2025 Data...</h3>
-            <p className="text-slate-500 mt-2">Checking Google Search for the most up-to-date facts.</p>
+            <p className="text-slate-500 mt-4 max-w-sm mx-auto">
+              We're verifying real-time facts using Google Search. This might take up to 20 seconds depending on service traffic.
+            </p>
           </div>
         )}
 
@@ -206,7 +219,7 @@ const App: React.FC = () => {
             </div>
             <div className="mt-12 pt-8 border-t flex flex-col sm:flex-row justify-between items-center gap-4">
               <p className="text-xs text-slate-400 font-medium">
-                <i className="fa-solid fa-clock mr-1"></i> Updated real-time for 2025.
+                <i className="fa-solid fa-clock mr-1"></i> Result cached for this session.
               </p>
               <Button onClick={goHome}>Return Home</Button>
             </div>
@@ -222,17 +235,17 @@ const App: React.FC = () => {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <i className="fa-solid fa-triangle-exclamation text-2xl text-red-500"></i>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Service Busy</h3>
-            <p className="text-red-700 mb-6 leading-relaxed">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Service is Busy</h3>
+            <p className="text-red-700 mb-6 leading-relaxed text-sm">
               {state.error?.includes('capacity') || state.error?.includes('quota') 
-                ? "We've hit our API limit for the minute due to high demand. Please wait about 30-60 seconds and try again."
+                ? "The AI service is currently receiving a high volume of requests. Our automatic retry attempt also failed. Please wait a moment."
                 : state.error}
             </p>
             <div className="flex flex-col gap-3">
-              <Button onClick={() => window.location.reload()} variant="danger">
-                Refresh App
+              <Button onClick={handleRetry} className="w-full py-4">
+                Try Again Now
               </Button>
-              <Button onClick={goHome} variant="outline">
+              <Button onClick={goHome} variant="outline" className="w-full py-4">
                 Back to Home
               </Button>
             </div>

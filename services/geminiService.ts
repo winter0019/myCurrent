@@ -2,20 +2,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Category, Question } from "../types";
 
+// Simple in-memory cache to prevent redundant API calls during the same session
+const hubCache: Record<string, string> = {};
+
 // Utility for exponential backoff retry logic
-const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+const callWithRetry = async <T>(fn: () => Promise<T>, retries = 4, delay = 3000): Promise<T> => {
   try {
     return await fn();
   } catch (error: any) {
+    const errorStr = JSON.stringify(error).toLowerCase();
     const isRateLimit = error?.status === 429 || 
                         error?.message?.includes('429') || 
-                        error?.message?.includes('RESOURCE_EXHAUSTED') ||
-                        error?.message?.includes('quota');
+                        errorStr.includes('resource_exhausted') ||
+                        errorStr.includes('quota');
                         
     if (retries > 0 && isRateLimit) {
       console.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} retries left)`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callWithRetry(fn, retries - 1, delay * 2);
+      // Increase delay exponentially: 3s, 7s, 15s, 31s
+      return callWithRetry(fn, retries - 1, (delay * 2) + 1000);
     }
     throw error;
   }
@@ -44,7 +49,7 @@ export const generateQuestions = async (count: number = 5): Promise<Question[]> 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Generate ${count} professional multiple-choice quiz questions for a Nigerian Civil Servant. 
   Focus on 2025 Current Affairs, Public Service Rules, Ethics, and the 1999 Constitution. 
-  Verify 2025 events using Google Search.`;
+  Use Google Search Grounding to ensure 2025 facts are accurate.`;
 
   const task = async () => {
     const response = await ai.models.generateContent({
@@ -76,19 +81,24 @@ export const generateQuestions = async (count: number = 5): Promise<Question[]> 
     return await callWithRetry(task);
   } catch (error: any) {
     console.error("Quiz generation failed:", error);
-    if (error.message?.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("The service is currently at peak capacity. Please wait a minute and try again.");
+    if (JSON.stringify(error).includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("The API is currently heavily loaded. Please wait a few seconds before retrying.");
     }
-    throw new Error("Failed to generate questions. Please check your connection.");
+    throw new Error("Failed to generate questions. Please check your internet connection.");
   }
 };
 
-export const generateFactSheet = async (sectionPrompt: string): Promise<string> => {
+export const generateFactSheet = async (sectionId: string, sectionPrompt: string): Promise<string> => {
+  // Return cached content if available
+  if (hubCache[sectionId]) {
+    console.log(`Serving ${sectionId} from cache`);
+    return hubCache[sectionId];
+  }
+
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Provide a comprehensive, highly detailed, and formatted markdown list or table for the year 2025 based on this request: ${sectionPrompt}. 
-  Ensure data is specific to Nigeria and global context where applicable. 
-  Use Google Search to verify names of ministers, portfolios, female leaders, acronyms, and election dates. 
-  Present the information clearly for a professional civil servant audience.`;
+  Focus on specific 2025 data. 
+  Use Google Search to verify details for a professional audience.`;
 
   const task = async () => {
     const response = await ai.models.generateContent({
@@ -98,15 +108,18 @@ export const generateFactSheet = async (sectionPrompt: string): Promise<string> 
         tools: [{ googleSearch: {} }],
       },
     });
-    return response.text || "No data available at the moment.";
+    
+    const text = response.text || "No data available at the moment.";
+    hubCache[sectionId] = text; // Cache successful response
+    return text;
   };
 
   try {
     return await callWithRetry(task);
   } catch (error: any) {
     console.error("Fact sheet generation failed:", error);
-    if (error.message?.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("Knowledge Hub quota reached. Please wait a moment before trying another section.");
+    if (JSON.stringify(error).includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("Knowledge Hub quota reached. The AI service is currently throttled. Please try again in 30 seconds.");
     }
     throw new Error("Could not retrieve the knowledge hub data. Please try again.");
   }
