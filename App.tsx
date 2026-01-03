@@ -80,7 +80,7 @@ const App: React.FC = () => {
             <i className="fa-solid fa-graduation-cap text-lg"></i>
           </div>
           <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">
-            NAIJA<span className="text-emerald-600">PROMO</span>
+            asy<span className="text-emerald-600">book</span>
           </h1>
         </button>
         {state.status !== 'idle' && (
@@ -241,7 +241,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-16 py-8 border-t border-slate-200 w-full max-w-4xl flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-sm">
-        <p>© 2025 NaijaPromo Knowledge Hub. Built for Excellence.</p>
+        <p>© 2025 asybook Knowledge Hub. Built for Excellence.</p>
         <div className="flex gap-6">
           <span className="flex items-center gap-2"><i className="fa-solid fa-shield-halved text-emerald-500"></i> Secure</span>
           <span className="flex items-center gap-2"><i className="fa-solid fa-bolt text-amber-500"></i> AI Powered</span>
