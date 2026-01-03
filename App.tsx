@@ -41,11 +41,7 @@ const App: React.FC = () => {
         status: 'active'
       }));
     } catch (error: any) {
-      // Clean error message to remove JSON or technical details
-      const msg = error.message?.includes('429') || error.message?.includes('quota') 
-        ? "Service is temporarily busy. Please try again in 30 seconds." 
-        : "Something went wrong. Please check your connection and try again.";
-      setState(prev => ({ ...prev, status: 'error', error: msg }));
+      setState(prev => ({ ...prev, status: 'error', error: "The system is momentarily busy. Please try again shortly." }));
     }
   }, []);
 
@@ -61,10 +57,7 @@ const App: React.FC = () => {
         hubTitle: section.title
       }));
     } catch (error: any) {
-      const msg = error.message?.includes('429') || error.message?.includes('quota') 
-        ? "Knowledge Hub is currently at capacity. Please try again shortly." 
-        : "Failed to load facts. Please try again.";
-      setState(prev => ({ ...prev, status: 'error', error: msg }));
+      setState(prev => ({ ...prev, status: 'error', error: "Our data hub is currently at full capacity. Please check back in a moment." }));
     }
   }, []);
 
@@ -162,9 +155,9 @@ const App: React.FC = () => {
             <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <i className="fa-solid fa-spinner fa-spin text-3xl text-emerald-600"></i>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800">Fetching latest data...</h3>
+            <h3 className="text-2xl font-bold text-slate-800">Please wait...</h3>
             <p className="text-slate-500 mt-4 max-w-sm mx-auto">
-              Please wait while we gather current information. This usually takes a few seconds.
+              We are retrieving the latest 2025 information for you.
             </p>
           </div>
         )}
@@ -225,8 +218,8 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="mt-12 pt-8 border-t flex flex-col sm:flex-row justify-between items-center gap-4">
-              <p className="text-xs text-slate-400 font-medium">
-                <i className="fa-solid fa-clock mr-1"></i> Result cached for this session.
+              <p className="text-xs text-slate-400 font-medium italic">
+                <i className="fa-solid fa-clock mr-1"></i> Information synced for your current session.
               </p>
               <Button onClick={goHome}>Return Home</Button>
             </div>
@@ -238,20 +231,20 @@ const App: React.FC = () => {
         )}
 
         {state.status === 'error' && (
-          <div className="text-center p-12 bg-red-50 rounded-3xl border border-red-200 max-w-md mx-auto animate-fadeIn">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <i className="fa-solid fa-triangle-exclamation text-2xl text-red-500"></i>
+          <div className="text-center p-12 bg-white rounded-3xl shadow-xl border border-slate-100 max-w-md mx-auto animate-fadeIn">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="fa-solid fa-hourglass-half text-2xl text-slate-400"></i>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Service Busy</h3>
-            <p className="text-red-700 mb-6 leading-relaxed text-sm">
-              We're currently experiencing high traffic. Please try again in a few moments.
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Almost There...</h3>
+            <p className="text-slate-500 mb-6 leading-relaxed text-sm">
+              {state.error}
             </p>
             <div className="flex flex-col gap-3">
               <Button onClick={handleRetry} className="w-full py-4">
-                Try Again
+                Try Again Now
               </Button>
               <Button onClick={goHome} variant="outline" className="w-full py-4">
-                Back to Home
+                Return to Home
               </Button>
             </div>
           </div>

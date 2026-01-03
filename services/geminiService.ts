@@ -2,11 +2,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Category, Question } from "../types";
 
-// Simple in-memory cache to prevent redundant API calls during the same session
-const hubCache: Record<string, string> = {};
+// Persistent session cache to survive refreshes during the same tab session
+const getCachedData = (key: string): string | null => {
+  try {
+    return sessionStorage.getItem(`hub_cache_${key}`);
+  } catch {
+    return null;
+  }
+};
 
-// Utility for exponential backoff retry logic
-const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promise<T> => {
+const setCachedData = (key: string, value: string): void => {
+  try {
+    sessionStorage.setItem(`hub_cache_${key}`, value);
+  } catch (e) {
+    console.warn("Failed to save to session storage", e);
+  }
+};
+
+// Utility for exponential backoff with jitter
+const callWithRetry = async <T>(fn: () => Promise<T>, retries = 4, baseDelay = 5000): Promise<T> => {
   try {
     return await fn();
   } catch (error: any) {
@@ -17,10 +31,15 @@ const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000)
                         errorStr.includes('quota');
                         
     if (retries > 0 && isRateLimit) {
-      console.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} retries left)`);
+      // Add jitter to prevent multiple clients from retrying at the exact same millisecond
+      const jitter = Math.random() * 2000;
+      const delay = baseDelay + jitter;
+      
+      console.warn(`Rate limit hit. Retrying in ${Math.round(delay)}ms... (${retries} retries left)`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      // Increase delay: 4s, 10s, 22s
-      return callWithRetry(fn, retries - 1, (delay * 2) + 2000);
+      
+      // Increase base delay significantly for next attempt
+      return callWithRetry(fn, retries - 1, baseDelay * 2.5);
     }
     throw error;
   }
@@ -90,18 +109,17 @@ export const generateQuestions = async (count: number = 5): Promise<Question[]> 
 };
 
 export const generateFactSheet = async (sectionId: string, sectionPrompt: string): Promise<string> => {
-  // Return cached content if available
-  if (hubCache[sectionId]) {
-    return hubCache[sectionId];
-  }
+  const cached = getCachedData(sectionId);
+  if (cached) return cached;
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Provide a comprehensive, highly detailed, and formatted markdown list or table for the year 2025 based on this request: ${sectionPrompt}. 
   Focus on specific 2025 data. Use Google Search.`;
 
   const task = async () => {
+    // Using flash-lite for fact sheets to potentially access a different/higher quota tier
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-flash-lite-latest',
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -109,7 +127,7 @@ export const generateFactSheet = async (sectionId: string, sectionPrompt: string
     });
     
     const text = response.text || "No data available at the moment.";
-    hubCache[sectionId] = text;
+    setCachedData(sectionId, text);
     return text;
   };
 
