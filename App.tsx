@@ -218,11 +218,24 @@ const App: React.FC = () => {
         )}
 
         {state.status === 'error' && (
-          <div className="text-center p-12 bg-red-50 rounded-3xl border border-red-200 max-w-md mx-auto">
-            <i className="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-4"></i>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h3>
-            <p className="text-red-700 mb-6">{state.error}</p>
-            <Button onClick={goHome} variant="danger">Back to Home</Button>
+          <div className="text-center p-12 bg-red-50 rounded-3xl border border-red-200 max-w-md mx-auto animate-fadeIn">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="fa-solid fa-triangle-exclamation text-2xl text-red-500"></i>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Service Busy</h3>
+            <p className="text-red-700 mb-6 leading-relaxed">
+              {state.error?.includes('capacity') || state.error?.includes('quota') 
+                ? "We've hit our API limit for the minute due to high demand. Please wait about 30-60 seconds and try again."
+                : state.error}
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button onClick={() => window.location.reload()} variant="danger">
+                Refresh App
+              </Button>
+              <Button onClick={goHome} variant="outline">
+                Back to Home
+              </Button>
+            </div>
           </div>
         )}
       </main>
